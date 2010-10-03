@@ -5,6 +5,7 @@ require 'prawn'
 require 'stringio'
 require "rsruby"
 
+$r=RSRuby.instance
 
 if RUBY_VERSION > "1.9"    
  require "csv"  
@@ -130,34 +131,55 @@ class Stager
     "#{split[1].capitalize} #{split[0]}"
   end
   
-  def get_T 
-    @r=[]
-    @f=[]
-    pattern=/.(T\d.)/
-    
-    @c["DIAGNOSIS_TEXT"].each do |d|
-      @r<<(d.match pattern)[1] if (d.match pattern)
-      @f<<d if not (d.match pattern)
-    end
-    puts "Tot= #{@c[-1].length}; found Ts =#{@r.length};  failures=#{(@f.length)}"
-    @r=r.map{|i| "p"+i.to_s}
-  end
+
 end
 
 class Plotter
   
-  def initialize stager_obj
-    @r=r=RSRuby.instance
+  def initialize table_array
+
+    @table_array=table_array
     #plot stager_obj.get_T, stager_obj.get_title
   end
   
-  def plot t, title
-    @r.barplot(@r.summary(@r.factor(t,order=T)))
+  def get_T 
+    @s=[]
+    @f=[]
+    pattern=/.(T\d.)/
+    
+    @table_array.each do |row|
+      @s<<(row["DIAGNOSIS_TEXT"].match pattern)[1] if (row["DIAGNOSIS_TEXT"].match pattern)
+      @f<<row if not (row["DIAGNOSIS_TEXT"].match pattern)
+    end
+    puts "Tot= #{@table_array.length}; found Ts =#{@s.length};  failures=#{(@f.length)}"
+    @s=@s.map{|i| "p"+i.to_s}
+  end
+  
+  def plot
+    $r.barplot($r.summary($r.factor(get_T,{:order=>"T"})))
+    $r.title({:main=>"HELLO",:sub=>"sub",:xlab=>"p",:ylab=>"n"})
+     
+    # $r.factor
+    #     $r.barplot(@r.summary(@r.factor(t,order=T)))
     #R.res=t
     #R.eval("barplot(summary(factor(res, order=T)),main='#{title}',ylab='n.cases',xlab='stage')")
   end
-
 end
+
+
+class MasterPlotter
+
+  def initialize(file_name="./subset_prostate_dump_prostatectomy_only.csv")
+    @file_name=file_name
+    @s=Stager.new @file_name
+  end
+  
+  
+  
+end
+
+
+
 class ArrayDesigner
   
   # size [number of rows,number of columns]
