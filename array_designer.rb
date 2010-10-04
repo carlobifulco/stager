@@ -248,7 +248,7 @@ class MasterPlotter
     @graphs.each do |g|
        g.plot self.get_xlim
      end
-    $r.dev_off()
+    $r.dev_off.call
     self.show_plot
     # R.eval("pdf(file=file_name)")
     # R.eval("plot(plot_data)")
