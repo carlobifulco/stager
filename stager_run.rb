@@ -11,22 +11,19 @@ dumps_file_names=Dir.glob DUMPS_DIR
 
 
 def walkover dumps_file_names
-  Dir.chdir "/Users/carlobifulco/Dropbox/caHUB/caHubDumps_copy/"
+  results_dir="results"
+  Dir.mkdir results_dir unless Dir.exist? results_dir
+  Dir.chdir results_dir
   dumps_file_names.each do |f|
     5.times {puts}
     puts b=((Pathname.new f).basename).to_s
     m=MasterPlotter.new 2009, f
-    begin
-      m.save_pdf_plot
-    rescue
-    end
-    begin
-      m.save_png_plot
-    rescue
-    end
+
+    m.save_png_plot
+    m.save_pdf_plot
     m.get_count
   end
-  MasterPlotter.save_csv
+  #MasterPlotter.save_csv
   Dir.chdir OLD_DIR
 end
 
@@ -34,7 +31,7 @@ end
 
 def all
   dumps_file_names=Dir.glob DUMPS_DIR
-  Dir.chdir "/Users/carlobifulco/Dropbox/caHUB/caHubDumps_copy/"
+  #Dir.chdir "/Users/carlobifulco/Dropbox/caHUB/caHubDumps_copy/"
   walkover dumps_file_names
   Dir.chdir OLD_DIR
 end

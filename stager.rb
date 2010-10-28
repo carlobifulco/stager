@@ -1,4 +1,3 @@
-require "rinruby"
 require "pathname"
 require "rsruby"
 require "csv"
@@ -12,27 +11,10 @@ $r=RSRuby.instance
 $FIELD_TO_SCAN= "DIAGNOSIS_TEXT"
 
 
-puts "no deletes row; yes approves"
+
 
 #ENCOUNTERNUMBER	CORPORATENUMBER	PATIENTNAME	DOB	SEX	CASE_NUMBER	CASE_REPORTING_DATE	SPECIMENTYPE	
 #REPORT_SECTION	ORDERING_PROVIDER	REPORT_TAT	RESPONSIBLE_PATHOLOGIST	CASE_STATUS	SIGNED_DT	DIAGNOSIS_TEXT	AGEATOBSERVATION
-
-def para text
-  a=text.split
-  f=[]
-
-  a.each do |x|
-      f << x
-      if (f.join(" ").split "\n")[-1].length/7 > 8
-      
-      
-        f<< "\n"
-      elsif x.index "*"
-        f<< "\n"
-      end
-  end
-  f.join " "
-end
 
 
 module CountT
@@ -64,12 +46,12 @@ module CountT
     (count all_t).select{|k,v| v>0}
   end
   
-  def get_T table_array
-    RSRuby.set_default_mode(RSRuby::VECTOR_CONVERSION)
-    r=RSRuby.instance
+  def get_T table_array,pattern=/.(T\d)./ #ONLY Ts
+    #RSRuby.set_default_mode(RSRuby::VECTOR_CONVERSION)
+    #r=RSRuby.instance
     s=[]
     f=[]
-    pattern=/.(T\d)./ #ONLY Ts
+    #pattern=/.(T\d)./ #ONLY Ts
     #pattern=/.(T\d.)/ #ALSO As
   
     table_array.each do |row|
@@ -80,12 +62,12 @@ module CountT
     s=(s.map{|i| abcd(("p"+i.to_s).upcase.strip)})
     #puts s
     s.select!{|i| i if (i[2].to_i>0 and i[2].to_i<5)} #remove T0 and T5...
-    r.assign("s",s)
+    #r.assign("s",s)
     #puts r.factor(s,{:order=>"T"})
     #puts r.data_frame(r.table(r.factor(s,{:order=>"T"})))
-    results=r.eval_R("data.frame(table(factor(s)))")
-    puts "#{results['Var1']}, #{results['Freq']}"
-    RSRuby.set_default_mode RSRuby::NO_CONVERSION
+    #results=r.eval_R("data.frame(table(factor(s)))")
+    #puts "#{results['Var1']}, #{results['Freq']}"
+    #RSRuby.set_default_mode RSRuby::NO_CONVERSION
     return s
   end
   
@@ -215,7 +197,7 @@ class Plotter
   end
   
   def plot xlim
-    $r.barplot($r.summary($r.factor(get_T,{:order=>"T"})),{:xlim=>[0,xlim],:ylim=>[0,4],:horiz=>"True", :cex_names=>1})
+    $r.barplot($r.summary($r.factor(@stage,{:order=>"T"})),{:xlim=>[0,xlim],:ylim=>[0,4],:horiz=>"True", :cex_names=>1})
     
     #$r.barplot(get_T,{:horiz=>"True", :cex_names=>1})
     $r.title({:main=>@title,:xlab=>"Cases #",:ylab=>"Stage"})
@@ -230,23 +212,28 @@ end
 class SpreadSheet
   include CountT
   attr_accessor :dumps_file_names
-  def initialize(new_csv_file_name, year=2010, directory="/Users/carlobifulco/Dropbox/caHUB/caHubDumps_copy")
+  def initialize(new_csv_file_name, year=2009, directory="/Users/carlobifulco/Dropbox/caHUB/caHubDumps_copy")
     results_dir="results"
     Dir.mkdir results_dir unless Dir.exist? results_dir
     @dumps_file_names=Dir.glob File.join(directory,"*.csv")
-    @fh=File.open(File.join (results_dir,new_csv_file_name),"w")
+    @fh=File.open(File.join(results_dir,new_csv_file_name),"w")
     @year=year
   end
-  
-  def scan
+   #pattern=/.(T\d)./ #ONLY Ts
+    #pattern=/.(T\d.)/ #ALSO As
+  def scan regex
     @fh.write (["SITE"].concat header).to_csv
     @dumps_file_names.each do |i|
       puts i
-      s=Stager.new @year,i
-      @fh.write (["#{s.get_title} PSV"].concat get_count_array  (get_T s.get_sv)).to_csv
-      @fh.write (["#{s.get_title} PPMC"].concat get_count_array  (get_T s.get_sp)).to_csv
-      @fh.write (["#{s.get_title} Other Sites"].concat get_count_array  (get_T s.get_not_sv_sp)).to_csv
-      10.times {puts}
+      begin
+        s=Stager.new @year,i
+        @fh.write (["#{s.get_title} PSV"].concat get_count_array  (get_T s.get_sv, regex)).to_csv
+        @fh.write (["#{s.get_title} PPMC"].concat get_count_array  (get_T s.get_sp, regex)).to_csv
+        @fh.write (["#{s.get_title} Other Sites"].concat get_count_array  (get_T s.get_not_sv_sp,regex)).to_csv
+        10.times {puts}
+      rescue
+        puts "ERROR #{i}"
+      end
     end
     @fh.close
   end
@@ -260,7 +247,8 @@ class MasterPlotter
   
   attr_accessor :s,:graphs, :xlim, :output_table
 
-  def initialize (year,file_name="./test.csv")#(file_name="./subset_prostate_dump_prostatectomy_only.csv")
+  def initialize (year,file_name="./test.csv",graph_name=nil)#(file_name="./subset_prostate_dump_prostatectomy_only.csv")
+    @graph_name=graph_name
     @file_name=file_name
     @s=Stager.new(year,@file_name)
     $r.par({:mfrow=>[4,1]})
@@ -282,19 +270,27 @@ class MasterPlotter
   def get_xlim
     @xlim=[]
     @graphs.each do |g|
-      @xlim<<[g.s.select{|x| x=="pT1"}.length,
-        g.s.select{|x| x=="pT2"}.length,
-        g.s.select{|x| x=="pT3"}.length,
-        g.s.select{|x| x=="pT4"}.length].max
+      puts g.stage
+      @xlim<<[g.stage.select{|x| x=="PT1"}.length,
+        g.stage.select{|x| x=="PT2"}.length,
+        g.stage.select{|x| x=="PT3"}.length,
+        g.stage.select{|x| x=="PT4"}.length].max
     end
     @xlim.max
   end
   
   def load_graphs
-    @graphs<<g1=(Plotter.new @s.get_all,"#{@s.get_title} PSA")
-    @graphs<<g2=(Plotter.new @s.get_sv, "#{@s.get_title} PSV")
-    @graphs<<g3=(Plotter.new @s.get_sp,"#{@s.get_title} PPMC")
-    @graphs<<g4=(Plotter.new @s.get_not_sv_sp, "#{@s.get_title} Not PSA-PPMC")
+    if not @graph_name
+      @graphs<<g1=(Plotter.new @s.get_all,"#{@s.get_title} PSA")
+      @graphs<<g2=(Plotter.new @s.get_sv, "#{@s.get_title} PSV")
+      @graphs<<g3=(Plotter.new @s.get_sp,"#{@s.get_title} PPMC")
+      @graphs<<g4=(Plotter.new @s.get_not_sv_sp, "#{@s.get_title} Not PSV-PPMC")
+    else
+      @graphs<<g1=(Plotter.new @s.get_all,"#{@graph_name} PSA")
+      @graphs<<g2=(Plotter.new @s.get_sv, "#{@graph_name} PSV")
+      @graphs<<g3=(Plotter.new @s.get_sp,"#{@graph_name} PPMC")
+      @graphs<<g4=(Plotter.new @s.get_not_sv_sp, "#{@graph_name} Not PSV-PPMC")
+    end
   end
   
   def get_count 
@@ -336,10 +332,7 @@ class MasterPlotter
     $r.par({:las=>2}) 
     $r.par({:mar=>[5,8,4,2]})
     @graphs.each do |g|
-      begin
        g.plot self.get_xlim
-      rescue
-      end
     end
     $r.dev_off.call
     #self.show_plot
@@ -348,20 +341,17 @@ class MasterPlotter
     # R.eval("dev.off()")
   end
   
-  def save_pdf_plot
+  def save_pdf_plot pdf_file_name=nil
     
-    pdf_file_name=(@s.get_title.split.join "_")+".pdf"
-    #puts pdf_file_name
+    pdf_file_name=(@s.get_title.split.join "_")+".pdf" unless pdf_file_name
+    puts Dir.getwd+" "+pdf_file_name
     # width = 480, height = 480, units = "px",
     $r.pdf({:file=>"#{pdf_file_name}",:paper=>"letter"})
     $r.par({:mfrow=>[4,1]})
     $r.par({:las=>2}) 
     $r.par({:mar=>[5,8,4,2]})
     @graphs.each do |g|
-      begin
        g.plot self.get_xlim
-      rescue
-      end
     end
     $r.dev_off.call
     #self.show_plot
