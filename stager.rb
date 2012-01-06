@@ -212,7 +212,7 @@ end
 class SpreadSheet
   include CountT
   attr_accessor :dumps_file_names
-  def initialize(new_csv_file_name, year=2009, directory="/Users/carlobifulco/Dropbox/caHUB/caHubDumps_copy")
+  def initialize(new_csv_file_name, year=2010, directory="/Users/carlobifulco/Dropbox/caHUB/caHubDumps_copy")
     results_dir="results"
     Dir.mkdir results_dir unless Dir.exist? results_dir
     @dumps_file_names=Dir.glob File.join(directory,"*.csv")
@@ -243,7 +243,7 @@ end
 class MasterPlotter
   
   @@output_table=([]<<["C","pT1","pT2","pT3","pT4"])
-  @@csv_file_name="~/Dropbox/code/stager/Master_tumor_stage_list.csv"
+  @@csv_file_name="~/test.csv"
   
   attr_accessor :s,:graphs, :xlim, :output_table
 
@@ -305,7 +305,9 @@ class MasterPlotter
   end
   
   def MasterPlotter.save_csv
-   CSV.open(@@csv_file_name,"w") do |csv|
+    puts @@csv_file_name
+    #CSV.open(@@csv_file_name,"w") do |csv|
+    CSV.open(OUTPUT_CSV,"w") do |csv|
      @@output_table.each do |r| 
         csv << r
       end

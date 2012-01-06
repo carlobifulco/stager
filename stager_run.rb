@@ -1,15 +1,33 @@
+#Supposed to be Staging 
+#-------------------------------
+
+
+# stager.rb needs RSruby; on OSX
+# export R_HOME=/Library/Frameworks/R.framework/Resources 
+# gem install rsruby -- --with-R-dir=$R_HOME
+# set env, again for os x
+ENV["R_HOME"]='/Library/Frameworks/R.framework/Resources'
+
 require_relative "./stager"
 require "pathname"
 require "csv"
 
-DUMPS_DIR="/Users/carlobifulco/Dropbox/caHUB/caHubDumps_copy/*.csv"
+###Settings to be changed...
+
+#Finds all csv files in directory
+DUMPS_DIR="/Volumes/NO\ NAME/*.csv"
 OLD_DIR=Dir.getwd
-dumps_file_names=Dir.glob DUMPS_DIR
+
+
+# output csv file
+OUTPUT_CSV="./master_csv.csv"
+# test file
+TEST_FILE="./test.csv"
 
 
 
 
-
+#Run over files and act
 def walkover dumps_file_names
   results_dir="results"
   Dir.mkdir results_dir unless Dir.exist? results_dir
@@ -17,28 +35,24 @@ def walkover dumps_file_names
   dumps_file_names.each do |f|
     5.times {puts}
     puts b=((Pathname.new f).basename).to_s
-    m=MasterPlotter.new 2009, f
-
+    m=MasterPlotter.new 2010, f
     m.save_png_plot
     m.save_pdf_plot
     m.get_count
   end
-  #MasterPlotter.save_csv
   Dir.chdir OLD_DIR
+  MasterPlotter.save_csv
 end
 
     
-
+#Call this to run the process
 def all
   dumps_file_names=Dir.glob DUMPS_DIR
   #Dir.chdir "/Users/carlobifulco/Dropbox/caHUB/caHubDumps_copy/"
   walkover dumps_file_names
-  Dir.chdir OLD_DIR
 end
 
-
-def test file_name="/Users/carlobifulco/Dropbox/caHUB/caHubDumps_copy/breast1_carcinoma_caHub_dump_1.csv"
+# test function
+def test file_name=TEST_FILE
   walkover ([]<<file_name)
-  Dir.chdir OLD_DIR
-  
 end
